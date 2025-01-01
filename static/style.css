@@ -12,6 +12,10 @@ body {
     color: #fff;
 }
 
+/*canvas#cnv {*/
+/*    image-rendering: pixelated;*/
+/*}*/
+
 button.button {
     appearance: none;
     background-color: #2ea44f;

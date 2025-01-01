@@ -77,11 +77,13 @@ type Game struct {
 }
 
 type Action struct {
+    // {{{
 	Type     ActionType `json:"type"`     // skip == other fields are ignored
 	Spell    Spell      `json:"spell"`    // empty means none was used
 	Cell     [4]int     `json:"cell"`     // [x  y  0 0] if single; [x1  y1  x2  y2 ] if double
 	Moved    [4]int     `json:"moved"`    // [x' y' 0 0] if single; [x1' y1' x2' y2'] if double
 	Attacked [4]int     `json:"attacked"` // [x" y" 0 0] if single; [x1" y1" x2" y2"] if double
+    // }}}
 }
 
 // - functions --------------------------------------------------------------------
@@ -121,24 +123,17 @@ func make_random_game() Game {
 // - types ------------------------------------------------------------------------
 
 type ReqJoinLobby struct {
-	PlayerID string `json:"player_id"`
 	LobbyID  string `json:"lobby_id"`
 }
 type ResJoinLobby struct {
 	Ok bool `json:"ok"`
 }
 
-type ReqNewLobby struct {
-	PlayerID string `json:"player_id"`
-}
+// type ReqNewLobby struct { }
 type ResNewLobby struct {
 	LobbyID string `json:"lobby_id"`
 }
 
-// type ReqNewPlayer = nil
-type ResNewPlayer struct {
-	PlayerID string `json:"player_id"`
-}
 
 // - functions --------------------------------------------------------------------
 
@@ -195,19 +190,10 @@ func handle_join_lobby(w http.ResponseWriter, r *http.Request) {
 
 func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
 	// {{{
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
-
-	var new_lobby_data ReqNewLobby
-	err := json.NewDecoder(r.Body).Decode(&new_lobby_data)
-	if err != nil {
-		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Received JSON: %v\n", new_lobby_data)
 
 	response := ResNewLobby{
 		LobbyID: make_id(6),
@@ -218,21 +204,6 @@ func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
 	// }}}
 }
 
-func handle_new_player(w http.ResponseWriter, r *http.Request) {
-	// {{{
-	if r.Method != http.MethodGet {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	response := ResNewPlayer{
-		PlayerID: make_id(64),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-	// }}}
-}
 
 // ================================================================================
 // MAIN
@@ -242,7 +213,6 @@ func main() {
 	http.HandleFunc("/api/test", handle_test)
 	http.HandleFunc("/api/join", handle_join_lobby)
 	http.HandleFunc("/api/new/lobby", handle_new_lobby)
-	http.HandleFunc("/api/new/player", handle_new_player)
 
 	// Start the server
 	log.Println("Server is running on http://localhost:6969")
