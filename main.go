@@ -77,13 +77,13 @@ type Game struct {
 }
 
 type Action struct {
-    // {{{
+	// {{{
 	Type     ActionType `json:"type"`     // skip == other fields are ignored
 	Spell    Spell      `json:"spell"`    // empty means none was used
 	Cell     [4]int     `json:"cell"`     // [x  y  0 0] if single; [x1  y1  x2  y2 ] if double
 	Moved    [4]int     `json:"moved"`    // [x' y' 0 0] if single; [x1' y1' x2' y2'] if double
 	Attacked [4]int     `json:"attacked"` // [x" y" 0 0] if single; [x1" y1" x2" y2"] if double
-    // }}}
+	// }}}
 }
 
 // - functions --------------------------------------------------------------------
@@ -123,7 +123,7 @@ func make_random_game() Game {
 // - types ------------------------------------------------------------------------
 
 type ReqJoinLobby struct {
-	LobbyID  string `json:"lobby_id"`
+	LobbyID string `json:"lobby_id"`
 }
 type ResJoinLobby struct {
 	Ok bool `json:"ok"`
@@ -133,7 +133,6 @@ type ResJoinLobby struct {
 type ResNewLobby struct {
 	LobbyID string `json:"lobby_id"`
 }
-
 
 // - functions --------------------------------------------------------------------
 
@@ -203,7 +202,6 @@ func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 	// }}}
 }
-
 
 // ================================================================================
 // MAIN

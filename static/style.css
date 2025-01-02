@@ -5,16 +5,15 @@ body {
     color: #fff;
 }
 
-#data, #log {
-    outline: solid 2px #e7e7e7;
-    margin: 1rem 0;
-    width: 90%;
-    color: #fff;
+#lobby_code {
+    width: 8rem;
+    color: #000;
 }
 
-/*canvas#cnv {*/
-/*    image-rendering: pixelated;*/
-/*}*/
+canvas#cnv {
+    width: min(720px, 100%);
+    /*image-rendering: pixelated;*/
+}
 
 button.button {
     appearance: none;

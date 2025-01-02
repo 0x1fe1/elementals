@@ -32,6 +32,8 @@ COLORS[ELEMENT.ENERGY] /**/ = ['#d946ef', '#6d28d9'] // fuchsia-500   violet-700
 //COLORS[ELEMENT.NATURE] /**/ = { fill: { h: 0, s: 0, l: 0 }, stroke: { h: 0, s: 0, l: 0 } }
 //COLORS[ELEMENT.ENERGY] /**/ = { fill: { h: 0, s: 0, l: 0 }, stroke: { h: 0, s: 0, l: 0 } }
 
+const PI = Math.PI;
+let GAME = {};
 let LOBBY_ID = '';
 let mouse = { x: -1000, y: -1000 }
 
@@ -71,21 +73,108 @@ async function post(path, data) {
     // }}}
 }
 
+//function render_block({ ctx, x, y, radius }) {
+//    // {{{
+//    radius *= 1.2;
+//    const num_points = 4
+//
+//    const angles = []
+//    for (let i = 0; i < num_points; i++) {
+//        angles.push(PI / 4 + i * 2 * PI / num_points)
+//    }
+//
+//    const points = []
+//    for (let i = 0; i < num_points; i++) {
+//        points.push({
+//            x: Math.cos(angles[i]),
+//            y: -Math.sin(angles[i]),
+//        })
+//    }
+//
+//    const inner_points = []
+//    for (let i = 0; i < num_points; i++) {
+//        inner_points.push({
+//            x: points[i].x * 0.7,
+//            y: points[i].y * 0.7,
+//        })
+//    }
+//
+//    const vertices = []
+//    for (let i = 0; i < num_points; i++) {
+//        const prev = points[(i - 1 + num_points) % num_points]
+//        const curr = points[i]
+//        const next = points[(i + 1) % num_points]
+//        vertices.push({ x: curr.x + (prev.x - curr.x) / 6, y: curr.y + (prev.y - curr.y) / 6 })
+//        vertices.push({ x: curr.x + (next.x - curr.x) / 6, y: curr.y + (next.y - curr.y) / 6 })
+//    }
+//
+//    for (let i = 0; i < vertices.length; i++) {
+//        vertices[i].x = vertices[i].x * radius + x
+//        vertices[i].y = vertices[i].y * radius + y
+//    }
+//    for (let i = 0; i < points.length; i++) {
+//        points[i].x = points[i].x * radius + x
+//        points[i].y = points[i].y * radius + y
+//    } inner_points
+//    for (let i = 0; i < inner_points.length; i++) {
+//        inner_points[i].x = inner_points[i].x * radius + x
+//        inner_points[i].y = inner_points[i].y * radius + y
+//    }
+//
+//    ctx.beginPath();
+//    ctx.moveTo(vertices[0].x, vertices[0].y);
+//    for (let i = 0; i < vertices.length; i += 2) {
+//        const p1 = points[i / 2]
+//        const v1 = vertices[i + 1]
+//        const v2 = vertices[(i + 2) % vertices.length]
+//        ctx.quadraticCurveTo(p1.x, p1.y, v1.x, v1.y)
+//        ctx.lineTo(v2.x, v2.y)
+//    }
+//
+//    //const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+//    //gradient.addColorStop(0, COLORS[element][0]);
+//    //gradient.addColorStop(1, COLORS[element][1]);
+//    ctx.fillStyle = "#737373";
+//    ctx.fill();
+//    ctx.strokeStyle = "#262626";
+//    ctx.lineWidth = 2;
+//    ctx.stroke();
+//
+//    ctx.fillStyle = "#262626";
+//    for (let i = 0; i < inner_points.length; i++) {
+//        ctx.beginPath();
+//        ctx.ellipse(inner_points[i].x, inner_points[i].y, radius * 0.1, radius * 0.1, 0, 0, PI * 2)
+//        ctx.fill();
+//    }
+//    // }}}
+//}
 
-/** @param {CanvasRenderingContext2D} ctx - The canvas rendering context. */
-function render_elemental(ctx, x, y, size, level, element, health) {
+function render_elemental({ ctx, x, y, radius, reverse, level, element, health, type }) {
     // {{{
-    const num_edges = level + 2
-    if (level === 1) y += size * 0.15;
-    if (level === 3) y += size * 0.05;
+    if (type !== "elemental") return;
+
+    const num_points = level + 2
+    let delta_y = 0;
+    if (level === 1) delta_y += radius * 0.15 * (reverse ? -1 : 1);
+    if (level === 3) delta_y += radius * 0.05 * (reverse ? -1 : 1);
+
+    const MULTS = {
+        1: 0.7,
+        2: 0.8,
+        3: 0.9,
+    }
+    const size_mult = MULTS[level] ?? 1.0
 
     const angles = []
-    for (let i = 0; i < num_edges; i++) {
-        angles.push(Math.PI * 0.5 + i * 2 * Math.PI / num_edges)
+    for (let i = 0; i < num_points; i++) {
+        angles.push(
+            (reverse ? -1 : 1) * PI * 0.5 +
+            i * 2 * PI / num_points
+        )
     }
 
     const points = []
-    for (let i = 0; i < num_edges; i++) {
+    for (let i = 0; i < num_points; i++) {
         points.push({
             x: Math.cos(angles[i]),
             y: -Math.sin(angles[i]),
@@ -93,21 +182,21 @@ function render_elemental(ctx, x, y, size, level, element, health) {
     }
 
     const vertices = []
-    for (let i = 0; i < num_edges; i++) {
-        const prev = points[(i - 1 + num_edges) % num_edges]
+    for (let i = 0; i < num_points; i++) {
+        const prev = points[(i - 1 + num_points) % num_points]
         const curr = points[i]
-        const next = points[(i + 1) % num_edges]
+        const next = points[(i + 1) % num_points]
         vertices.push({ x: curr.x + (prev.x - curr.x) / 6, y: curr.y + (prev.y - curr.y) / 6 })
         vertices.push({ x: curr.x + (next.x - curr.x) / 6, y: curr.y + (next.y - curr.y) / 6 })
     }
 
     for (let i = 0; i < vertices.length; i++) {
-        vertices[i].x = vertices[i].x * size + x
-        vertices[i].y = vertices[i].y * size + y
+        vertices[i].x = vertices[i].x * radius * size_mult + x
+        vertices[i].y = vertices[i].y * radius * size_mult + y + delta_y
     }
     for (let i = 0; i < points.length; i++) {
-        points[i].x = points[i].x * size + x
-        points[i].y = points[i].y * size + y
+        points[i].x = points[i].x * radius * size_mult + x
+        points[i].y = points[i].y * radius * size_mult + y + delta_y
     }
 
     //console.log({ vertices, points })
@@ -122,7 +211,7 @@ function render_elemental(ctx, x, y, size, level, element, health) {
         ctx.lineTo(v3.x, v3.y)
     }
 
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+    const gradient = ctx.createRadialGradient(x, y + delta_y, 0, x, y + delta_y, radius);
     gradient.addColorStop(0, COLORS[element][0]);
     gradient.addColorStop(1, COLORS[element][1]);
     ctx.fillStyle = gradient;
@@ -131,18 +220,39 @@ function render_elemental(ctx, x, y, size, level, element, health) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    //ctx.strokeStyle = "red"
-    //for (let i = 0; i < vertices.length; i++) {
-    //    ctx.beginPath();
-    //    ctx.ellipse(vertices[i].x, vertices[i].y, 4, 4, 0, 0, Math.PI * 2)
-    //    ctx.stroke();
-    //}
-    //ctx.strokeStyle = "yellow"
-    //for (let i = 0; i < sharp_vertices.length; i++) {
-    //    ctx.beginPath();
-    //    ctx.ellipse(sharp_vertices[i].x, sharp_vertices[i].y, 4, 4, 0, 0, Math.PI * 2)
-    //    ctx.stroke();
-    //}
+    const max_hp = MAX_HEALTH[level - 1];
+    const hp_percentage = Math.max(0, Math.min(1, health / max_hp));
+    const health_angles = [
+        -PI / 2,
+        -PI / 2 - hp_percentage * 2 * PI
+    ];
+    const hp_y = y + (reverse ? -1 : 1) * radius * 0.7;
+    const hp_r = radius * 0.2;
+    //console.log({ x, y, hp_percentage, max_hp, health_angles })
+
+    ctx.fillStyle = hp_percentage <= 0.33 ? "#ff0000" : hp_percentage <= 0.5 ? "#ffff00" : "#00ff00";
+    ctx.beginPath();
+    ctx.moveTo(x, hp_y);
+    ctx.lineTo(x, hp_y - hp_r);
+    ctx.arc(x, hp_y, hp_r, health_angles[0], health_angles[1], true);
+    ctx.closePath();
+    ctx.fill();
+
+    if (hp_percentage < 1) {
+        ctx.fillStyle = "#1f2937";
+        ctx.beginPath();
+        ctx.moveTo(x, hp_y);
+        ctx.lineTo(x, hp_y - hp_r);
+        ctx.arc(x, hp_y, hp_r, health_angles[0], health_angles[1], false);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "#1f2937";
+    ctx.beginPath();
+    ctx.ellipse(x, hp_y, hp_r, hp_r, 0, 0, PI * 2)
+    ctx.stroke();
     // }}}
 }
 
@@ -157,16 +267,19 @@ function render() {
     const BOARD_SIZE = 12;
     const ctx = canvas.getContext("2d");
     let [h, s, l] = [0, 0, 0]
+    const m = { x: mouse.x * canvas.width, y: mouse.y * canvas.height }
 
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const delta = 2
 
     const cell_size = canvas.width / BOARD_SIZE;
     for (let row = 0; row < BOARD_SIZE; row++) {
         for (let col = 0; col < BOARD_SIZE; col++) {
             const x = col * cell_size;
             const y = row * cell_size;
-            const hovering = mouse.x >= x && mouse.x < x + cell_size && mouse.y >= y && mouse.y < y + cell_size;
+            const hovering = m.x >= x && m.x < x + cell_size && m.y >= y && m.y < y + cell_size;
+            const cell = GAME.board[row][col];
 
             if (row < 6) { // green
                 if ((col + row) % 2 === 1) {
@@ -181,29 +294,33 @@ function render() {
                     ;[h, s, l] = [200, 100, 40]
                 }
             }
-            //if (hovering) {
-            //    ;[h,s,l] = [48, 96, 53]
-            //}
 
+            if (cell.type === "block") {
+                s = 0;
+            }
             ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
+            ctx.strokeStyle = `#1e293b`
             ctx.lineWidth = 1;
-            ctx.strokeStyle = hovering ? `#e7e7e7` : `#1e293b`
             //ctx.strokeStyle = row < 6 ? `#4ade80` : `#2563eb`
             ctx.fillRect(x, y, cell_size, cell_size);
-            ctx.strokeRect(x + 1*hovering, y + 1*hovering, cell_size - 2*hovering, cell_size - 2*hovering);
+            ctx.strokeRect(x, y, cell_size, cell_size);
 
-            //if (selected) {
-            //    ctx.fillStyle = `hsl(48, 96%, 53%)`;
-            //    ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
-            //    ctx.fillStyle = `hsl()`;
-            //}
+            if (hovering) {
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = `#cbd5e1`
+                ctx.strokeRect(x + delta * hovering, y + delta * hovering, cell_size - 2 * delta * hovering, cell_size - 2 * delta * hovering);
+            }
+
+            if (cell.type !== "elemental") { continue; }
+            render_elemental({
+                ctx,
+                x: x + cell_size / 2,
+                y: y + cell_size / 2,
+                radius: cell_size / 2,
+                reverse: row < 6,
+                ...cell,
+            })
         }
-    }
-
-    for (let i = 0; i < 12; i++) {
-        render_elemental(ctx, cell_size * 0 + cell_size / 2, cell_size * i + cell_size / 2, cell_size / 2, 1, ELEMENTS[i % 6], 1);
-        render_elemental(ctx, cell_size * 1 + cell_size / 2, cell_size * i + cell_size / 2, cell_size / 2, 2, ELEMENTS[i % 6], 1);
-        render_elemental(ctx, cell_size * 2 + cell_size / 2, cell_size * i + cell_size / 2, cell_size / 2, 3, ELEMENTS[i % 6], 1);
     }
 
     requestAnimationFrame(render);
@@ -235,10 +352,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("cnv").addEventListener("mousemove", (event) => {
         const rect = event.target.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        const mouseX = (event.clientX - rect.left) / rect.width;
+        const mouseY = (event.clientY - rect.top) / rect.height;
         mouse = { x: mouseX, y: mouseY }
     });
+    GAME = await get("/api/test");
     requestAnimationFrame(render);
     // }}}
 });

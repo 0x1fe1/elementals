@@ -4,20 +4,20 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Elementals</title>
-        <!--<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔥</text></svg>">-->
         <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="64x64" />
-        <script src="client.js" defer></script>
+        <link rel="stylesheet" type="text/css" href="reset.css" />
         <link rel="stylesheet" type="text/css" href="style.css" />
+        <script src="client.js" defer></script>
     </head>
     <body>
         <form id="join_lobby">
             <label for="lobby_code">Enter a Lobby:</label>
             <input type="text" id="lobby_code" name="lobby_code" required>
-            <button type="submit">Join</button>
+            <button type="submit" class="button">Join</button>
         </form>
         <form id="new_lobby">
             <label>Create a New Lobby:</label>
-            <button type="submit">Enter</button>
+            <button type="submit" class="button">Create</button>
         </form>
         <p id="response"></p>
         <canvas id="cnv" width="720" height="720"></canvas>
