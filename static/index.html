@@ -10,16 +10,20 @@
         <script src="client.js" defer></script>
     </head>
     <body>
-        <form id="join_lobby">
-            <label for="lobby_code">Enter a Lobby:</label>
-            <input type="text" id="lobby_code" name="lobby_code" required>
-            <button type="submit" class="button">Join</button>
-        </form>
-        <form id="new_lobby">
-            <label>Create a New Lobby:</label>
-            <button type="submit" class="button">Create</button>
-        </form>
-        <p id="response"></p>
+        <div style="display:flex;gap:2rem;margin-bottom:0.5rem;">
+            <form id="join_lobby">
+                <input type="text" id="lobby_code" required>
+                <button type="submit">Join</button>
+            </form>
+            <div style="display:flex;gap:0.5rem;">
+                <button id="new_lobby">Create a New Lobby</button>
+                <div id="response"></div>
+            </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+            <button id="skip" class="button">Skip</button>
+            <button id="confirm" class="button">Confirm</button>
+        </div>
         <canvas id="cnv" width="720" height="720"></canvas>
     </body>
 </html>

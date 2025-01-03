@@ -2,16 +2,33 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
+	"slices"
 	"time"
 )
 
-// = GAME =========================================================================
+// {{{ UTILS
 
-// - types ------------------------------------------------------------------------
+func make_id(length int) string {
+	// {{{
+	const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = characters[rng.Intn(len(characters))]
+	}
+	return string(result)
+	// }}}
+}
 
+// }}}
+
+// {{{ GAME
+
+// {{{ Types
 type Element string
 type Spell string
 type CellType string
@@ -35,31 +52,24 @@ const ( // {{{
 	NATURE Element = "nature"
 	ENERGY Element = "energy"
 
-	FS Spell = "FS"
-	HV Spell = "HV"
-	AF Spell = "AF"
-	DT Spell = "DT"
-	MS Spell = "MS"
+	FS Spell = "fs"
+	HV Spell = "hv"
+	AF Spell = "af"
+	DT Spell = "dt"
+	MS Spell = "ms"
 ) // }}}
 
 var ( // {{{
-	ACTION_TYPES = [...]ActionType{SKIP, SINGLE, DOUBLE}
-	CELL_TYPES   = [...]CellType{EMPTY, BLOCK, ELEMENTAL}
-	SPELLS       = [...]Spell{FS, HV, AF, DT, MS}
-	ELEMENTS     = [...]Element{AIR, ROCK, FIRE, WATER, NATURE, ENERGY}
-	LEVELS       = [...]int{1, 2, 3} // 111 -> _2_ points+1 | 222 -> _3_ points+2
-	HEALTH       = [...]int{1, 2, 6}
-	DAMAGE       = [...]int{1, 2, 4}
-	REACH        = [...]int{3, 5, 7}
-	SPELL_INDEX  = map[string]int{
-		"FS": 0, // Forest  Staff
-		"HV": 1, // Healing Vial
-		"AF": 2, // Ancient Figurine
-		"DT": 3, // Double  Turn
-		"MS": 4, // Meteor  Shower
-	}
-	SPELL_POINTS = [...]int{4, 5, 7, 9, 10}
-	SPELL_DAMAGE = [...]int{2, 1, 4}
+	ACTION_TYPES = []ActionType{SKIP, SINGLE, DOUBLE}
+	CELL_TYPES   = []CellType{EMPTY, BLOCK, ELEMENTAL}
+	SPELLS       = []Spell{FS, HV, AF, DT, MS}
+	ELEMENTS     = []Element{AIR, ROCK, FIRE, WATER, NATURE, ENERGY}
+	LEVELS       = []int{1, 2, 3} // 111 -> _2_ points+1 | 222 -> _3_ points+2
+	HEALTH       = []int{1, 2, 6}
+	DAMAGE       = []int{1, 2, 4}
+	REACH        = []int{3, 5, 7}
+	SPELL_POINTS = []int{4, 5, 7, 9, 10}
+	SPELL_DAMAGE = []int{2, 1, 4}
 ) // }}}
 
 type Game struct {
@@ -76,6 +86,14 @@ type Game struct {
 	// }}}
 }
 
+type GameWrapper struct {
+	// {{{
+	Game      Game
+	Players   []string
+	CreatedAt time.Time
+	// }}}
+}
+
 type Action struct {
 	// {{{
 	Type     ActionType `json:"type"`     // skip == other fields are ignored
@@ -86,8 +104,9 @@ type Action struct {
 	// }}}
 }
 
-// - functions --------------------------------------------------------------------
+// }}}
 
+// {{{ Functions
 func make_random_game() Game {
 	// {{{
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -118,68 +137,81 @@ func make_random_game() Game {
 	// }}}
 }
 
-// = NETWORK ======================================================================
+// }}}
 
-// - types ------------------------------------------------------------------------
+// }}}
 
-type ReqJoinLobby struct {
+// {{{ NETWORK
+
+// {{{ Types
+type JoinReq struct {
+	PlayerID string `json:"player_id"`
+	LobbyID  string `json:"lobby_id"`
+}
+type JoinRes struct {
+	Ok   bool `json:"ok"`
+	Game Game `json:"game"`
+}
+
+type NewLobbyReq struct {
+	PlayerID string `json:"player_id"`
+}
+type NewLobbyRes struct {
 	LobbyID string `json:"lobby_id"`
-}
-type ResJoinLobby struct {
-	Ok bool `json:"ok"`
+	Game    Game   `json:"game"`
 }
 
-// type ReqNewLobby struct { }
-type ResNewLobby struct {
-	LobbyID string `json:"lobby_id"`
+type NewPlayerRes struct {
+	PlayerID string `json:"player_id"`
 }
 
-// - functions --------------------------------------------------------------------
-
-func make_id(length int) string {
-	// {{{
-	const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	result := make([]byte, length)
-	for i := 0; i < length; i++ {
-		result[i] = characters[rng.Intn(len(characters))]
-	}
-	return string(result)
-	// }}}
+type ActionReq struct {
+	LobbyID  string `json:"lobby_id"`
+	PlayerID string `json:"player_id"`
+	Action   Action `json:"action"`
+}
+type ActionRes struct {
+	Ok   bool `json:"ok"`
+	Game Game `json:"game"`
 }
 
-func handle_test(w http.ResponseWriter, r *http.Request) {
-	// {{{
-	if r.Method != http.MethodGet {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
+// }}}
 
-	response := make_random_game()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-	// }}}
-}
-
-func handle_join_lobby(w http.ResponseWriter, r *http.Request) {
+// {{{ Functions
+func handle_join(w http.ResponseWriter, r *http.Request) {
 	// {{{
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var join_data ReqJoinLobby
-	err := json.NewDecoder(r.Body).Decode(&join_data)
+	var data JoinReq
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
+	log.Printf("Join Lobby Request: %+v\n", data)
 
-	log.Printf("Received JSON: %v\n", join_data)
+	lobby_id := data.LobbyID
 
-	response := ResJoinLobby{
-		Ok: true,
+	game, ok := games[lobby_id]
+
+	if !ok {
+		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
+		return
+	}
+
+	if !slices.Contains(game.Players, data.PlayerID) {
+		game.Players = append(game.Players, data.PlayerID)
+		games[lobby_id] = game
+	}
+
+	log.Printf("Lobby: %v, Players: %+v", lobby_id, game.Players)
+
+	response := JoinRes{
+		Ok:   ok,
+		Game: game.Game,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -189,13 +221,29 @@ func handle_join_lobby(w http.ResponseWriter, r *http.Request) {
 
 func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
 	// {{{
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	response := ResNewLobby{
-		LobbyID: make_id(6),
+	var data NewLobbyReq
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	log.Printf("New Lobby Request: %+v\n", data)
+
+	lobby_id := make_id(6)
+	game := make_random_game()
+	games[lobby_id] = GameWrapper{
+		Game:      game,
+		Players:   []string{data.PlayerID},
+		CreatedAt: time.Now(),
+	}
+	response := NewLobbyRes{
+		LobbyID: lobby_id,
+		Game:    game,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -203,16 +251,118 @@ func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
 	// }}}
 }
 
-// ================================================================================
-// MAIN
+func handle_new_player(w http.ResponseWriter, r *http.Request) {
+	// {{{
+	if r.Method != http.MethodGet {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	player_id := make_id(16)
+	response := NewPlayerRes{
+		PlayerID: player_id,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+	// }}}
+}
+
+func handle_action(w http.ResponseWriter, r *http.Request) {
+	// {{{
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var data ActionReq
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	log.Printf("Action Request: %+v\n", data)
+
+	game, ok := games[data.LobbyID]
+
+	if !ok {
+		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
+		return
+	}
+
+	if len(game.Players) >= 2 &&
+		slices.Index(game.Players, data.PlayerID) == game.Game.ActivePlayer &&
+		slices.Index(ACTION_TYPES, data.Action.Type) != -1 {
+		game.Game.Turn += 1
+		game.Game.ActivePlayer = (game.Game.ActivePlayer + 1) % 2
+
+		switch data.Action.Type {
+		case SKIP:
+			break
+		case SINGLE:
+			{
+			}
+		case DOUBLE:
+			{
+			}
+		}
+
+        games[data.LobbyID] = game
+	}
+
+	response := ActionRes{
+		Ok:   ok,
+		Game: game.Game,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+	// }}}
+}
+
+// }}}
+
+// }}}
+
+// {{{ MAIN
+
+var games = make(map[string]GameWrapper)
 
 func main() {
 	http.Handle("/", http.FileServer(http.Dir("./static")))
-	http.HandleFunc("/api/test", handle_test)
-	http.HandleFunc("/api/join", handle_join_lobby)
+	http.HandleFunc("/api/join", handle_join)
 	http.HandleFunc("/api/new/lobby", handle_new_lobby)
+	http.HandleFunc("/api/new/player", handle_new_player)
+	http.HandleFunc("/api/action", handle_action)
 
-	// Start the server
+	go func() {
+		// {{{ cleanup
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			fmt.Println("Starting cleanup.")
+
+			var keysToDelete []string
+			for k, v := range games {
+				if time.Since(v.CreatedAt) >= time.Hour {
+					keysToDelete = append(keysToDelete, k)
+				}
+			}
+
+			fmt.Printf("Cleaning up %v games...\n", len(keysToDelete))
+
+			for _, key := range keysToDelete {
+				delete(games, key)
+			}
+
+			fmt.Println("Cleanup complete.")
+		}
+		// }}}
+	}()
+
 	log.Println("Server is running on http://localhost:6969")
 	log.Fatal(http.ListenAndServe(":6969", nil))
 }
+
+// }}}
