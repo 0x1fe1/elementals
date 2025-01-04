@@ -6,8 +6,9 @@ body {
 }
 
 #lobby_code {
-    width: 8rem;
+    width: 4rem;
     color: #000;
+    text-align: center;
 }
 
 canvas#cnv {
