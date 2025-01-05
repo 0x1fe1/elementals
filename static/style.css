@@ -5,15 +5,18 @@ body {
     color: #fff;
 }
 
-#lobby_code {
-    width: 4rem;
+#lobby_code, #response {
+    min-width: 6rem;
+    width: 6rem;
     color: #000;
     text-align: center;
+    padding: 0 0.5rem;
 }
 
 canvas#cnv {
     width: min(720px, 100%);
     /*image-rendering: pixelated;*/
+    margin-bottom: 0.5rem;
 }
 
 button {

@@ -1,3 +1,4 @@
+// <<< GAME CONSTS
 const ELEMENT = {
     AIR: 'air',
     ROCK: 'rock',
@@ -42,13 +43,14 @@ const ACTION = {
     MOVE: 'move',
     ATTACK: 'attack',
 };
+// >>>
 
 const BOARD_SIZE = 12;
 const PI = Math.PI;
 let GAME = null;
 let LOBBY_ID = null;
 let PLAYER_ID = null;
-let PLAYER_NUMBER = -1; // 0 = first; 1 = second;
+let BOARD_REVERSE = false;
 let pointer = { x: -1000, y: -1000 };
 let selected_elemental = { row: -1, col: -1 };
 let selected_cell = { row: -1, col: -1 };
@@ -63,6 +65,14 @@ function valid(pos) {
     return pos.row >= 0 && pos.row < 12 && pos.col >= 0 && pos.col < 12;
 }
 
+function correct_player(pos) {
+    return BOARD_REVERSE !== (Math.floor(pos.row / (BOARD_SIZE / 2)) !== GAME.active_player)
+}
+
+function different_players(pos1, pos2) {
+    return Math.floor(pos1.row / (BOARD_SIZE / 2)) !== Math.floor(pos2.row / (BOARD_SIZE / 2))
+}
+
 function get_cell(pos) {
     if (!valid(pos) || GAME == null || GAME.board == null) return null
     return GAME.board[pos.row][pos.col]
@@ -72,25 +82,76 @@ function equal(pos1, pos2) {
     return pos1.col === pos2.col && pos1.row === pos2.row;
 }
 
+function aos2soa(aos) {
+    // <<<
+    let soa = {
+        players: aos.players,
+        active_player: aos.active_player,
+        turn: aos.turn,
+        board_soa: {
+            type: new Array(BOARD_SIZE).fill().map(() => new Array(BOARD_SIZE).fill()),
+            element: new Array(BOARD_SIZE).fill().map(() => new Array(BOARD_SIZE).fill()),
+            health: new Array(BOARD_SIZE).fill().map(() => new Array(BOARD_SIZE).fill()),
+            level: new Array(BOARD_SIZE).fill().map(() => new Array(BOARD_SIZE).fill()),
+        }
+    }
+
+    for (let i = 0; i < BOARD_SIZE; i++) {
+        for (let j = 0; j < BOARD_SIZE; j++) {
+            soa.board_soa.type[i][j] = aos.board[i][j].type
+            soa.board_soa.element[i][j] = aos.board[i][j].element
+            soa.board_soa.health[i][j] = aos.board[i][j].health
+            soa.board_soa.level[i][j] = aos.board[i][j].level
+        }
+    }
+
+    return soa
+    // >>>
+}
+function soa2aos(soa) {
+    // <<<
+    let aos = {
+        players: soa.players,
+        active_player: soa.active_player,
+        turn: soa.turn,
+        board: new Array(BOARD_SIZE).fill(null).map(() => new Array(BOARD_SIZE).fill(null)),
+    }
+
+    for (let i = 0; i < BOARD_SIZE; i++) {
+        for (let j = 0; j < BOARD_SIZE; j++) {
+            aos.board[i][j] = {
+                type: soa.board_soa.type[i][j],
+                element: soa.board_soa.element[i][j],
+                health: soa.board_soa.health[i][j],
+                level: soa.board_soa.level[i][j],
+            }
+        }
+    }
+
+    return aos
+    // >>>
+}
+
 async function fetch_get(path) {
-    // {{{
+    // <<<
     try {
         const response = await fetch(path, { method: 'GET', });
         if (!response.ok) {
             console.error('FETCH GET ERROR. RESPONSE:', response)
-            throw new Error('Network response was not ok');
+            throw new Error(await response.text());
         }
         const result = await response.json();
-        return result;
+        return { ok: true, result, error: null };
     } catch (error) {
         console.error('Error:', error);
-        return null;
+        document.querySelector('#error-response').textContent = error;
+        return { ok: false, result: null, error };
     }
-    // }}}
+    // >>>
 }
 
 async function fetch_post(path, data) {
-    // {{{
+    // <<<
     try {
         const response = await fetch(path, {
             method: 'POST',
@@ -99,19 +160,20 @@ async function fetch_post(path, data) {
         });
         if (!response.ok) {
             console.error('FETCH POST ERROR. RESPONSE:', response)
-            throw new Error('Network response was not ok');
+            throw new Error(await response.text());
         }
         const result = await response.json();
-        return result;
+        return { ok: true, result, error: null };
     } catch (error) {
         console.error('Error:', error);
-        return null;
+        document.querySelector('#error-response').textContent = error;
+        return { ok: false, result: null, error };
     }
-    // }}}
+    // >>>
 }
 
 function render_elemental({ ctx, x, y, radius, reverse, preview, level, element, health, type }) {
-    // {{{
+    // <<<
     if (type !== CELLTYPE.ELEMENTAL) return;
 
     const num_points = level + 2
@@ -220,11 +282,55 @@ function render_elemental({ ctx, x, y, radius, reverse, preview, level, element,
     ctx.beginPath();
     ctx.ellipse(x, hp_y, hp_r, hp_r, 0, 0, PI * 2)
     ctx.stroke();
-    // }}}
+    // >>>
+}
+
+function render_blank() {
+    // <<<
+    const canvas = document.getElementById('cnv');
+    if (!canvas || !canvas.getContext) {
+        console.error('Canvas not found or not supported!');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    let [h, s, l] = [0, 0, 0]
+
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const cell_size = canvas.width / BOARD_SIZE;
+    for (let row = 0; row < BOARD_SIZE; row++) {
+        for (let col = 0; col < BOARD_SIZE; col++) {
+            const x = col * cell_size;
+            const y = row * cell_size;
+
+            if (row < BOARD_SIZE / 2) {
+                if ((col + row) % 2 === 1) { // green
+                    ;[h, s, l] = [140, 70, 45]
+                } else {
+                    ;[h, s, l] = [140, 75, 35]
+                }
+            } else {
+                if ((col + row) % 2 === 1) { // blue
+                    ;[h, s, l] = [200, 80, 45]
+                } else {
+                    ;[h, s, l] = [200, 90, 35]
+                }
+            }
+
+            ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
+            ctx.strokeStyle = `#1e293b`
+            ctx.lineWidth = 1;
+            ctx.fillRect(x, y, cell_size, cell_size);
+            ctx.strokeRect(x, y, cell_size, cell_size);
+        }
+    }
+    // >>>
 }
 
 function render() {
-    // {{{
+    // <<<
     if (GAME === null) {
         return;
     }
@@ -262,11 +368,11 @@ function render() {
                 }
             }
 
-            const cell = get_cell({ row: PLAYER_NUMBER === 0 ? row : BOARD_SIZE - 1 - row, col });
+            const cell = get_cell({ row, col });
             if (cell.type === CELLTYPE.BLOCK) {
                 s = 0;
             }
-            if ((GAME.active_player === Math.floor(row / 6)) !== (PLAYER_NUMBER === 1)) {
+            if (BOARD_REVERSE !== (GAME.active_player === Math.floor(row / (BOARD_SIZE / 2)))) {
                 s *= 0.5;
             }
             ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
@@ -298,14 +404,14 @@ function render() {
                     y: y + cell_size / 2,
                     radius: cell_size / 2,
                     reverse: row < BOARD_SIZE / 2,
-                    preview: false || (GAME.active_player !== Math.floor(row / 6)) === (PLAYER_NUMBER === 1),
+                    preview: BOARD_REVERSE !== (GAME.active_player === Math.floor(row / (BOARD_SIZE / 2))),
                     ...cell,
                 })
             }
         }
     }
 
-    // {{{ preview elemental
+    // <<< preview elemental
     if (is_mobile) {
         if (valid(selected_elemental) && get_cell(selected_elemental).type === CELLTYPE.ELEMENTAL &&
             valid(selected_cell) && get_cell(selected_cell).type === CELLTYPE.EMPTY) {
@@ -347,16 +453,16 @@ function render() {
             })
         }
     }
-    // }}}
+    // >>>
 
-    // }}}
+    // >>>
 }
 
 let time_then = 0
 let time_delta = 0
 let clock = 0
 async function loop(time_now) {
-    // {{{
+    // <<<
     time_delta = time_now - time_then;
     time_then = time_now;
     clock += time_delta
@@ -364,19 +470,90 @@ async function loop(time_now) {
     if (clock > 1000 && LOBBY_ID != null && GAME != null) {
         clock = 0;
         const data = await fetch_post('/api/read', { lobby_id: LOBBY_ID })
-        if (data.ok === true) {
-            GAME = data.game;
+        if (data.ok && data.result.ok) {
+            GAME = soa2aos(data.result.game_soa);
+            if (BOARD_REVERSE) {
+                GAME.board = GAME.board.toReversed();
+            }
         }
     }
 
     render()
 
     requestAnimationFrame(loop);
-    // }}}
+    // >>>
+}
+
+async function handle_move() {
+    // <<<
+    const request = {
+        lobby_id: LOBBY_ID,
+        player_id: PLAYER_ID,
+        action: {
+            type: ACTION.MOVE,
+            from: {
+                col: selected_elemental.col,
+                row: selected_elemental.row,
+            },
+            to: {
+                col: selected_cell.col,
+                row: selected_cell.row,
+            },
+        },
+    }
+    if (BOARD_REVERSE) {
+        request.action.from.row = BOARD_SIZE - 1 - request.action.from.row
+        request.action.to.row = BOARD_SIZE - 1 - request.action.to.row
+    }
+    const data = await fetch_post('/api/action', request);
+    console.log("response:", data)
+    if (!data.ok || !data.result.ok) {
+        console.log('confirm (move) was unconfirmed:', request, data)
+        return
+    }
+    GAME = soa2aos(data.result.game_soa);
+    if (BOARD_REVERSE) {
+        GAME.board = GAME.board.toReversed();
+    }
+    // >>>
+}
+
+async function handle_attack() {
+    // <<<
+    const request = {
+        lobby_id: LOBBY_ID,
+        player_id: PLAYER_ID,
+        action: {
+            type: ACTION.ATTACK,
+            from: {
+                col: selected_elemental.col,
+                row: selected_elemental.row,
+            },
+            to: {
+                col: selected_cell.col,
+                row: selected_cell.row,
+            },
+        },
+    }
+    if (BOARD_REVERSE) {
+        request.action.from.row = BOARD_SIZE - 1 - request.action.from.row
+        request.action.to.row = BOARD_SIZE - 1 - request.action.to.row
+    }
+    const data = await fetch_post('/api/action', request);
+    console.log("response:", data)
+    if (!data.ok || !data.result.ok) {
+        console.log('confirm (attack) was unconfirmed:', request, data)
+        return
+    }
+    GAME = soa2aos(data.result.game_soa);
+    if (BOARD_REVERSE) {
+        GAME.board = GAME.board.toReversed();
+    }
+    // >>>
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // {{{
+    // <<<
     is_mobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     const join_lobby_form = document.getElementById('join_lobby');
     const new_lobby = document.getElementById('new_lobby');
@@ -387,64 +564,69 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (sessionStorage.getItem('PLAYER_ID') != null) {
         PLAYER_ID = sessionStorage.getItem('PLAYER_ID');
     } else {
-        PLAYER_ID = (await fetch_get('/api/new/player')).player_id;
-        sessionStorage.setItem('PLAYER_ID', PLAYER_ID);
+        const data = await fetch_get('/api/new/player');
+        if (data.ok) {
+            PLAYER_ID = data.result.player_id;
+            sessionStorage.setItem('PLAYER_ID', PLAYER_ID);
+        }
     }
 
+    new_lobby.addEventListener('click', async (_) => {
+        // <<<
+        const data = await fetch_post('/api/new/lobby', { player_id: PLAYER_ID })
+        console.log('Response:', data);
+        if (!data.ok) return
+        LOBBY_ID = data.result.lobby_id;
+        GAME = soa2aos(data.result.game_soa);
+        console.log(copy(GAME))
+        document.querySelector('#response').textContent = LOBBY_ID;
+        // >>>
+    });
     join_lobby_form.addEventListener('submit', async (event) => {
-        // {{{
+        // <<<
         event.preventDefault();
         const lobby_id = document.getElementById('lobby_code').value.toUpperCase();
         const data = await fetch_post('/api/join', { lobby_id, player_id: PLAYER_ID })
         console.log('Response:', data);
-        if (data == null || data.ok == null || data.ok !== true) return
+        if (!data.ok || !data.result.ok) return
         LOBBY_ID = lobby_id;
-        GAME = data.game;
-        PLAYER_NUMBER = 1;
-        document.querySelector('#response').textContent = `Lobby Code: ${LOBBY_ID}`
-        // }}}
-    });
-    new_lobby.addEventListener('click', async (_) => {
-        // {{{
-        const data = await fetch_post('/api/new/lobby', { player_id: PLAYER_ID })
-        console.log('Response:', data);
-        if (data == null || data.lobby_id == null || data.lobby_id == '') return
-        LOBBY_ID = data.lobby_id;
-        GAME = data.game;
-        PLAYER_NUMBER = 0;
-        document.querySelector('#response').textContent = `Lobby Code: ${LOBBY_ID}`;
-        // }}}
+        GAME = soa2aos(data.result.game_soa);
+        GAME.board = GAME.board.toReversed();
+        BOARD_REVERSE = true;
+        document.querySelector('#response').textContent = LOBBY_ID;
+        // >>>
     });
 
     if (!is_mobile) {
         canvas.addEventListener('pointermove', (event) => {
-            // {{{
+            // <<<
             const rect = event.target.getBoundingClientRect();
             const pointerX = (event.clientX - rect.left) / rect.width;
             const pointerY = (event.clientY - rect.top) / rect.height;
             pointer = { x: pointerX, y: pointerY };
-            const col = Math.floor(pointerX * 12);
-            const row = Math.floor(pointerY * 12);
+            const col = Math.floor(pointerX * BOARD_SIZE);
+            const row = Math.floor(pointerY * BOARD_SIZE);
             hovered_cell = { row, col };
-            // }}}
+            // >>>
         });
     }
     canvas.addEventListener('pointerup', (event) => {
-        // {{{
+        // <<<
         const rect = event.target.getBoundingClientRect();
         const pointerX = (event.clientX - rect.left) / rect.width;
         const pointerY = (event.clientY - rect.top) / rect.height;
-        const col = Math.floor(pointerX * 12);
-        const row = Math.floor(pointerY * 12);
+        const col = Math.floor(pointerX * BOARD_SIZE);
+        const row = Math.floor(pointerY * BOARD_SIZE);
         selected_cell = { row, col };
-        if (valid(selected_cell) && GAME != null && get_cell(selected_cell).type === CELLTYPE.ELEMENTAL) {
+        if (valid(selected_cell) && GAME != null && correct_player(selected_cell) &&
+            get_cell(selected_cell).type === CELLTYPE.ELEMENTAL) {
             selected_elemental = selected_cell;
         }
-        // }}}
+        // >>>
     });
 
     skip.addEventListener('click', async (event) => {
-        // {{{
+        // <<<
         event.preventDefault();
         const data = await fetch_post('/api/action', {
             lobby_id: LOBBY_ID,
@@ -452,45 +634,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             action: { type: ACTION.SKIP, }
         })
         console.log('Response:', data);
-        if (data.ok !== true) return
-        GAME = data.game;
-        document.querySelector('#response').textContent = `Lobby Code: ${LOBBY_ID}`;
-        // }}}
+        if (!data.ok || !data.result.ok) return
+        GAME = soa2aos(data.result.game_soa);
+        // >>>
     })
     confirm.addEventListener('click', async (event) => {
-        // {{{
+        // <<<
         event.preventDefault();
 
-        if (valid(selected_cell) && valid(selected_elemental) &&
-            !equal(selected_cell, selected_elemental) &&
-            get_cell(selected_cell).type === CELLTYPE.EMPTY &&
+        if (!valid(selected_cell) || !valid(selected_elemental) ||
+            equal(selected_cell, selected_elemental)) return
+
+        if (get_cell(selected_cell).type === CELLTYPE.EMPTY &&
             get_cell(selected_elemental).type === CELLTYPE.ELEMENTAL) {
-            const request = {
-                lobby_id: LOBBY_ID,
-                player_id: PLAYER_ID,
-                action: {
-                    type: ACTION.MOVE,
-                    from: {
-                        col: selected_elemental.col,
-                        row: selected_elemental.row,
-                    },
-                    to: {
-                        col: selected_cell.col,
-                        row: selected_cell.row,
-                    },
-                },
-            }
-            const data = await fetch_post('/api/action', request);
-            console.log("response:", data)
-            if (!data.ok) {
-                console.log('confirm was unconfirmed:', request, data)
-                return
-            }
-            GAME = data.game;
+            await handle_move();
         }
-        // }}}
+
+        if (get_cell(selected_cell).type === CELLTYPE.ELEMENTAL &&
+            get_cell(selected_elemental).type === CELLTYPE.ELEMENTAL &&
+            correct_player(selected_elemental) &&
+            different_players(selected_cell, selected_elemental)) {
+            await handle_attack();
+        }
+        // >>>
     })
 
+    render_blank()
+
     requestAnimationFrame(loop);
-    // }}}
+    // >>>
 });

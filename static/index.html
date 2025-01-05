@@ -10,20 +10,28 @@
         <script src="client.js" defer></script>
     </head>
     <body>
-        <div style="display:flex;gap:2rem;margin-bottom:0.5rem;">
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
             <form id="join_lobby">
                 <input type="text" id="lobby_code" required>
-                <button type="submit">Join</button>
+                <button type="submit">:Join</button>
             </form>
-            <div style="display:flex;gap:0.5rem;">
-                <button id="new_lobby">Create a New Lobby</button>
-                <div id="response"></div>
-            </div>
-        </div>
-        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
-            <button id="skip" class="button">Skip</button>
-            <button id="confirm" class="button">Confirm</button>
+            <!--</div>-->
+            <!--<div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">-->
+            <button id="new_lobby">Create a New Lobby:</button>
+            <div id="response" style="background:#fff;color:#000"></div>
         </div>
         <canvas id="cnv" width="720" height="720"></canvas>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+            <button id="fs" style="background:#4ade80;color:#000">Forest Staff</button>
+            <button id="hv" style="background:#38bdf8;color:#000">Healing Vile</button>
+            <button id="af" style="background:#334155;color:#fff">Ancient Figurine</button>
+            <button id="dt" style="background:#fde047;color:#000">Double Turn</button>
+            <button id="ms" style="background:#f97316;color:#000">Meteor Shower</button>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+            <button id="skip">Skip</button>
+            <button id="confirm">Confirm</button>
+        </div>
+        <div id="error-response"></div>
     </body>
 </html>

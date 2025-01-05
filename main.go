@@ -11,10 +11,8 @@ import (
 	"time"
 )
 
-// {{{ UTILS
-
 func make_id(length int) string {
-	// {{{
+	// <<<
 	const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	result := make([]byte, length)
@@ -22,18 +20,17 @@ func make_id(length int) string {
 		result[i] = characters[rng.Intn(len(characters))]
 	}
 	return string(result)
-	// }}}
+	// >>>
 }
 
-// }}}
+// =============================================================================
 
-// {{{ GAME Types
 type Element string
 type Spell string
 type CellType string
 type ActionType string
 
-const ( // {{{
+const ( // <<<
 	BOARD_SIZE = 12
 
 	SKIP   ActionType = "skip"
@@ -57,9 +54,9 @@ const ( // {{{
 	AF Spell = "af"
 	DT Spell = "dt"
 	MS Spell = "ms"
-) // }}}
+) // >>>
 
-var ( // {{{
+var ( // <<<
 	ACTION_TYPES = []ActionType{SKIP, SPELL, MOVE, ATTACK}
 	CELL_TYPES   = []CellType{EMPTY, ELEMENTAL, BLOCK}
 	SPELLS       = []Spell{FS, HV, AF, DT, MS}
@@ -70,39 +67,57 @@ var ( // {{{
 	REACH        = []int{3, 5, 7}
 	SPELL_POINTS = []int{4, 5, 7, 9, 10}
 	SPELL_DAMAGE = []int{2, 1, 4}
-) // }}}
+) // >>>
 
 type Cell struct {
-	// {{{
+	// <<<
 	Type    CellType `json:"type"`
 	Element Element  `json:"element"`
 	Health  int      `json:"health"`
 	Level   int      `json:"level"`
-	// }}}
+	// >>>
 }
 
 type Board [BOARD_SIZE][BOARD_SIZE]Cell
 
 type Game struct {
-	// {{{
+	// <<<
 	Board        Board     `json:"board"`
 	Players      [2][5]int `json:"players"`
 	ActivePlayer int       `json:"active_player"`
 	Turn         int       `json:"turn"`
-	// }}}
+	// >>>
+}
+
+type BoardSOA struct {
+	// <<<
+	Type    [BOARD_SIZE][BOARD_SIZE]CellType `json:"type"`
+	Element [BOARD_SIZE][BOARD_SIZE]Element  `json:"element"`
+	Health  [BOARD_SIZE][BOARD_SIZE]int      `json:"health"`
+	Level   [BOARD_SIZE][BOARD_SIZE]int      `json:"level"`
+	// >>>
+}
+
+type GameSOA struct {
+	// <<<
+	BoardSOA     BoardSOA  `json:"board_soa"`
+	Players      [2][5]int `json:"players"`
+	ActivePlayer int       `json:"active_player"`
+	Turn         int       `json:"turn"`
+	// >>>
 }
 
 type GameWrapper struct {
-	// {{{
+	// <<<
 	Game           Game
 	Players        []string
 	CreatedAt      time.Time
 	LastAccessedAt time.Time
-	// }}}
+	// >>>
 }
 
 type Action struct {
-	// {{{
+	// <<<
 	Type  ActionType `json:"type"`  // skip == other fields are ignored
 	Spell Spell      `json:"spell"` // empty means none was used
 	From  struct {
@@ -113,14 +128,54 @@ type Action struct {
 		Row int `json:"row"`
 		Col int `json:"col"`
 	} `json:"to"`
-	// }}}
+	// >>>
 }
 
-// }}}
+// =============================================================================
 
-// {{{ GAME Functions
+func aos2soa(aos Game) GameSOA {
+	// <<<
+	soa := GameSOA{
+		Players:      aos.Players,
+		ActivePlayer: aos.ActivePlayer,
+		Turn:         aos.Turn,
+	}
+
+	for i := 0; i < BOARD_SIZE; i++ {
+		for j := 0; j < BOARD_SIZE; j++ {
+			soa.BoardSOA.Type[i][j] = aos.Board[i][j].Type
+			soa.BoardSOA.Element[i][j] = aos.Board[i][j].Element
+			soa.BoardSOA.Health[i][j] = aos.Board[i][j].Health
+			soa.BoardSOA.Level[i][j] = aos.Board[i][j].Level
+		}
+	}
+
+	return soa
+	// >>>
+}
+func soa2aos(soa GameSOA) Game {
+	// <<<
+	aos := Game{
+		Players:      soa.Players,
+		ActivePlayer: soa.ActivePlayer,
+		Turn:         soa.Turn,
+	}
+
+	for i := 0; i < BOARD_SIZE; i++ {
+		for j := 0; j < BOARD_SIZE; j++ {
+			aos.Board[i][j].Type = soa.BoardSOA.Type[i][j]
+			aos.Board[i][j].Element = soa.BoardSOA.Element[i][j]
+			aos.Board[i][j].Health = soa.BoardSOA.Health[i][j]
+			aos.Board[i][j].Level = soa.BoardSOA.Level[i][j]
+		}
+	}
+
+	return aos
+	// >>>
+}
+
 func make_random_game() Game {
-	// {{{
+	// <<<
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	var game Game
 
@@ -146,15 +201,15 @@ func make_random_game() Game {
 	}
 
 	return game
-	// }}}
+	// >>>
 }
 
 func make_initial_game() Game {
-	// {{{
+	// <<<
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	var game Game
 
-	game.ActivePlayer = rng.Intn(2)
+	game.ActivePlayer = 0
 	game.Turn = 1
 
 	for i := 0; i < 2; i++ {
@@ -190,10 +245,11 @@ func make_initial_game() Game {
 	// }
 
 	return game
-	// }}}
+	// >>>
 }
 
-var configurations = [8][3][2]int{
+var merge_configurations = [8][3][2]int{
+	// <<<
 	{{-1, -1}, {+0, -1}, {+1, -1}},
 	{{-1, +0}, {+0, +0}, {+1, +0}},
 	{{-1, +1}, {+0, +1}, {+1, +1}},
@@ -202,18 +258,20 @@ var configurations = [8][3][2]int{
 	{{+1, -1}, {+1, +0}, {+1, +1}},
 	{{-1, -1}, {+0, +0}, {+1, +1}},
 	{{+1, -1}, {+0, +0}, {-1, +1}},
+	// >>>
 }
 
 // offset ::= 0 | 1
 func merge_board(prev Board, offset int) Board {
+	// <<<
 	next := prev
 	todo := [BOARD_SIZE / 2][BOARD_SIZE]byte{} // 0=nop; 1=remove; 2=ascend
 	o := offset * BOARD_SIZE / 2
 
 	for row := 1; row < BOARD_SIZE/2-1; row++ {
 		for col := 1; col < BOARD_SIZE-1; col++ {
-			for i := 0; i < len(configurations); i++ {
-				conf := configurations[i]
+			for i := 0; i < len(merge_configurations); i++ {
+				conf := merge_configurations[i]
 				a := prev[row+conf[0][1]+o][col+conf[0][0]]
 				b := prev[row+conf[1][1]+o][col+conf[1][0]]
 				c := prev[row+conf[2][1]+o][col+conf[2][0]]
@@ -247,61 +305,39 @@ func merge_board(prev Board, offset int) Board {
 	}
 
 	return next
+	// >>>
 }
 
-// }}}
-
-// {{{ NETWORK Types
-type JoinReq struct {
-	PlayerID string `json:"player_id"`
-	LobbyID  string `json:"lobby_id"`
-}
-type JoinRes struct {
-	Ok   bool `json:"ok"`
-	Game Game `json:"game"`
-}
-
-type NewLobbyReq struct {
-	PlayerID string `json:"player_id"`
-}
-type NewLobbyRes struct {
-	LobbyID string `json:"lobby_id"`
-	Game    Game   `json:"game"`
+func apply_damage(to, from Cell) Cell {
+	// <<<
+	to_internal := to
+	from_internal := from
+	to_internal.Health -= DAMAGE[from_internal.Level]
+	if to_internal.Health <= 0 {
+		to_internal.Level -= 1
+		if to_internal.Level <= 0 {
+			to_internal = Cell{Type: EMPTY}
+		} else {
+			to_internal.Health = HEALTH[to_internal.Level-1]
+		}
+	}
+	return to_internal
+	// >>>
 }
 
-type NewPlayerRes struct {
-	PlayerID string `json:"player_id"`
-}
+// =============================================================================
 
-type ActionReq struct {
-	LobbyID  string `json:"lobby_id"`
-	PlayerID string `json:"player_id"`
-	Action   Action `json:"action"`
-}
-type ActionRes struct {
-	Ok   bool `json:"ok"`
-	Game Game `json:"game"`
-}
-
-type ReadReq struct {
-	LobbyID string `json:"lobby_id"`
-}
-type ReadRes struct {
-	Ok   bool `json:"ok"`
-	Game Game `json:"game"`
-}
-
-// }}}
-
-// {{{ NETWORK Functions
 func handle_join(w http.ResponseWriter, r *http.Request) {
-	// {{{
+	// <<<
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var data JoinReq
+	var data struct {
+		PlayerID string `json:"player_id"`
+		LobbyID  string `json:"lobby_id"`
+	}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
@@ -310,42 +346,51 @@ func handle_join(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Join Lobby Request: %+v\n", data)
 
 	lobby_id := data.LobbyID
-
-	game, ok := games[lobby_id]
+	gw, ok := games[lobby_id]
 
 	if !ok {
 		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
 		return
 	}
 
-	game.LastAccessedAt = time.Now()
-	games[lobby_id] = game
-
-	if !slices.Contains(game.Players, data.PlayerID) {
-		game.Players = append(game.Players, data.PlayerID)
-		games[lobby_id] = game
+	if len(gw.Players) >= 2 /*&& !slices.Contains(game.Players, data.PlayerID)*/ {
+		http.Error(w, "Full Lobby", http.StatusBadRequest)
+		return
 	}
 
-	log.Printf("Lobby: %v, Players: %+v", lobby_id, game.Players)
+	gw.LastAccessedAt = time.Now()
+	games[lobby_id] = gw
 
-	response := JoinRes{
-		Ok:   ok,
-		Game: game.Game,
+	if !slices.Contains(gw.Players, data.PlayerID) {
+		gw.Players = append(gw.Players, data.PlayerID)
+		games[lobby_id] = gw
+	}
+
+	log.Printf("Lobby: %v, Players: %+v", lobby_id, gw.Players)
+
+	response := struct {
+		Ok      bool    `json:"ok"`
+		GameSOA GameSOA `json:"game_soa"`
+	}{
+		Ok:      ok,
+		GameSOA: aos2soa(gw.Game),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-	// }}}
+	// >>>
 }
 
 func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
-	// {{{
+	// <<<
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var data NewLobbyReq
+	var data struct {
+		PlayerID string `json:"player_id"`
+	}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
@@ -361,41 +406,50 @@ func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:      time.Now(),
 		LastAccessedAt: time.Now(),
 	}
-	response := NewLobbyRes{
+	response := struct {
+		LobbyID string  `json:"lobby_id"`
+		GameSOA GameSOA `json:"game_soa"`
+	}{
 		LobbyID: lobby_id,
-		Game:    game,
+		GameSOA: aos2soa(game),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-	// }}}
+	// >>>
 }
 
 func handle_new_player(w http.ResponseWriter, r *http.Request) {
-	// {{{
+	// <<<
 	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
 	player_id := make_id(16)
-	response := NewPlayerRes{
+	response := struct {
+		PlayerID string `json:"player_id"`
+	}{
 		PlayerID: player_id,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-	// }}}
+	// >>>
 }
 
 func handle_action(w http.ResponseWriter, r *http.Request) {
-	// {{{
+	// <<<
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var data ActionReq
+	var data struct {
+		LobbyID  string `json:"lobby_id"`
+		PlayerID string `json:"player_id"`
+		Action   Action `json:"action"`
+	}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
@@ -404,33 +458,38 @@ func handle_action(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Action Request: %+v\n", data)
 
 	gw, ok := games[data.LobbyID]
-	gw.LastAccessedAt = time.Now()
-	games[data.LobbyID] = gw
 
 	if !ok {
 		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
 		return
 	}
 
-	valid_action := len(gw.Players) >= 2 &&
+	gw.LastAccessedAt = time.Now()
+	games[data.LobbyID] = gw
+
+	valid_action := len(gw.Players) == 2 &&
 		slices.Index(gw.Players, data.PlayerID) == gw.Game.ActivePlayer &&
 		slices.Index(ACTION_TYPES, data.Action.Type) != -1
-	valid_action = true
 
 	if valid_action {
 		gw.Game.Turn += 1
-		gw.Game.ActivePlayer = (gw.Game.ActivePlayer + 1) % 2
+		gw.Game.ActivePlayer = 1 - gw.Game.ActivePlayer
 
-		act := data.Action
-
-		switch act.Type {
+		switch data.Action.Type {
 		case SKIP:
 			gw.Game.Board = merge_board(gw.Game.Board, gw.Game.Turn%2)
 		case SPELL:
+			break
 		case MOVE:
-			gw.Game.Board[act.To.Row][act.To.Col], gw.Game.Board[act.From.Row][act.From.Col] =
-				gw.Game.Board[act.From.Row][act.From.Col], gw.Game.Board[act.To.Row][act.To.Col]
+			to := data.Action.To
+			from := data.Action.From
+			gw.Game.Board[to.Row][to.Col], gw.Game.Board[from.Row][from.Col] =
+				gw.Game.Board[from.Row][from.Col], gw.Game.Board[to.Row][to.Col]
 		case ATTACK:
+			to := data.Action.To
+			from := data.Action.From
+			gw.Game.Board[to.Row][to.Col] = apply_damage(gw.Game.Board[to.Row][to.Col], gw.Game.Board[from.Row][from.Col])
+			break
 		default:
 			http.Error(w, "Invalid Action", http.StatusBadRequest)
 			return
@@ -439,53 +498,63 @@ func handle_action(w http.ResponseWriter, r *http.Request) {
 		games[data.LobbyID] = gw
 	}
 
-	response := ActionRes{
-		Ok:   valid_action,
-		Game: gw.Game,
+	response := struct {
+		Ok      bool    `json:"ok"`
+		GameSOA GameSOA `json:"game_soa"`
+	}{
+		Ok:      valid_action,
+		GameSOA: aos2soa(gw.Game),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-	// }}}
+	// >>>
 }
 
 func handle_read(w http.ResponseWriter, r *http.Request) {
-	// {{{
+	// <<<
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var data ReadReq
+	var data struct {
+		LobbyID string `json:"lobby_id"`
+	}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
-	// log.Printf("Read Request: %+v\n", data)
 
-	game, ok := games[data.LobbyID]
-	response := ReadRes{Ok: ok}
+	gw, ok := games[data.LobbyID]
 
-	if ok {
-		game.LastAccessedAt = time.Now()
-		games[data.LobbyID] = game
+	if !ok {
+		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
+		return
 	}
 
-	response.Game = game.Game
+	gw.LastAccessedAt = time.Now()
+	games[data.LobbyID] = gw
+	response := struct {
+		Ok      bool    `json:"ok"`
+		GameSOA GameSOA `json:"game_soa"`
+	}{
+		Ok:      ok,
+		GameSOA: aos2soa(gw.Game),
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-	// }}}
+	// >>>
 }
 
-// }}}
-
-// {{{ MAIN
+// =============================================================================
 
 var games = make(map[string]GameWrapper)
 
 func main() {
+	// <<<
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 	http.HandleFunc("/api/join", handle_join)
 	http.HandleFunc("/api/new/lobby", handle_new_lobby)
@@ -495,7 +564,7 @@ func main() {
 
 	if false {
 		go func() {
-			// {{{ cleanup
+			// <<< cleanup
 			ticker := time.NewTicker(time.Hour)
 			defer ticker.Stop()
 
@@ -517,15 +586,14 @@ func main() {
 
 				fmt.Println("Cleanup complete.")
 			}
-			// }}}
+			// >>>
 		}()
 	}
 
 	log.Println("Server is running on http://localhost:6969")
 	log.Fatal(http.ListenAndServe(":6969", nil))
+	// >>>
 }
-
-// }}}
 
 /*
 
