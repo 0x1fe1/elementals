@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -258,9 +259,9 @@ func make_initial_game() Game {
 
 	for i := 0; i < SIZE; i++ {
 		for j := 0; j < SIZE; j++ {
-            game.Board[i][j].Type = EMPTY
-        }
-    }
+			game.Board[i][j].Type = EMPTY
+		}
+	}
 
 	elements := make([]Element, len(ELEMENTS))
 	copy(elements, ELEMENTS)
@@ -536,7 +537,9 @@ func handle_join(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("Join Lobby Request: %+v\n", pretty_print(data))
 
 	lobby_id := data.LobbyID
-	gw, ok := games[lobby_id]
+	games.RLock()
+	gw, ok := games.m[lobby_id]
+	games.RUnlock()
 
 	if !ok {
 		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
@@ -551,12 +554,16 @@ func handle_join(w http.ResponseWriter, r *http.Request) {
 	player_index := slices.Index(gw.Players, data.PlayerID)
 
 	gw.LastAccessedAt = time.Now()
-	games[lobby_id] = gw
+	games.Lock()
+	games.m[lobby_id] = gw
+	games.Unlock()
 
 	if !slices.Contains(gw.Players, data.PlayerID) {
 		gw.Players = append(gw.Players, data.PlayerID)
 		gw.PlayerCanUseSpell = append(gw.PlayerCanUseSpell, true)
-		games[lobby_id] = gw
+		games.Lock()
+		games.m[lobby_id] = gw
+		games.Unlock()
 		player_index = len(gw.Players)
 	}
 
@@ -596,13 +603,15 @@ func handle_new_lobby(w http.ResponseWriter, r *http.Request) {
 
 	lobby_id := strings.ToUpper(make_id(6))
 	game := make_initial_game()
-	games[lobby_id] = GameWrapper{
+	games.Lock()
+	games.m[lobby_id] = GameWrapper{
 		Game:              game,
 		Players:           []string{data.PlayerID},
 		PlayerCanUseSpell: []bool{true},
 		CreatedAt:         time.Now(),
 		LastAccessedAt:    time.Now(),
 	}
+	games.Unlock()
 
 	response := struct {
 		LobbyID string  `json:"lobby_id"`
@@ -666,7 +675,9 @@ func handle_action(w http.ResponseWriter, r *http.Request) {
 	}
 	// log.Printf("Action Request: %+v\n", pretty_print(data))
 
-	gw, ok := games[data.LobbyID]
+	games.RLock()
+	gw, ok := games.m[data.LobbyID]
+	games.RUnlock()
 
 	if !ok {
 		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
@@ -786,7 +797,9 @@ func handle_action(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gw.LastAccessedAt = time.Now()
-	games[data.LobbyID] = gw
+	games.Lock()
+	games.m[data.LobbyID] = gw
+	games.Unlock()
 
 	response := struct {
 		Ok      bool    `json:"ok"`
@@ -817,7 +830,9 @@ func handle_read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gw, ok := games[data.LobbyID]
+	games.RLock()
+	gw, ok := games.m[data.LobbyID]
+	games.RUnlock()
 
 	if !ok {
 		http.Error(w, "Invalid Lobby ID", http.StatusBadRequest)
@@ -825,7 +840,9 @@ func handle_read(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gw.LastAccessedAt = time.Now()
-	games[data.LobbyID] = gw
+	games.Lock()
+	games.m[data.LobbyID] = gw
+	games.Unlock()
 	response := struct {
 		Ok      bool    `json:"ok"`
 		GameSOA GameSOA `json:"game_soa"`
@@ -841,7 +858,12 @@ func handle_read(w http.ResponseWriter, r *http.Request) {
 
 // =============================================================================
 
-var games = make(map[string]GameWrapper)
+var games = struct {
+	sync.RWMutex
+	m map[string]GameWrapper
+}{
+	m: make(map[string]GameWrapper),
+}
 
 func main() {
 	// <<<
@@ -862,17 +884,21 @@ func main() {
 				fmt.Println("Starting cleanup.")
 
 				var keysToDelete []string
-				for k, v := range games {
+                games.RLock()
+				for k, v := range games.m {
 					if time.Since(v.LastAccessedAt) >= time.Hour {
 						keysToDelete = append(keysToDelete, k)
 					}
 				}
+                games.RUnlock()
 
 				fmt.Printf("Cleaning up %v games...\n", len(keysToDelete))
 
+                games.Lock()
 				for _, key := range keysToDelete {
-					delete(games, key)
+					delete(games.m, key)
 				}
+                games.Unlock()
 
 				fmt.Println("Cleanup complete.")
 			}

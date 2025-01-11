@@ -757,11 +757,29 @@ async function loop(time_now) {
 
     if (clock > 1000 && LOBBY_ID != null && GAME != null) {
         clock = 0;
-        const data = await fetch_post('/api/read', { lobby_id: LOBBY_ID })
-        if (data.ok && data.result.ok) {
-            update_game(soa2aos(data.result.game_soa));
-        } else {
-            clock -= 1000
+
+        try {
+            fetch("/api/read", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lobby_id: LOBBY_ID }),
+            }).then(response => response.json())
+                .then(data => {
+                    if (data.ok) {
+                        update_game(soa2aos(data.game_soa));
+                    } else {
+                        clock -= 1000
+                    }
+                })
+                .catch(response => {
+                    console.error('FETCH POST ERROR. RESPONSE:', response)
+                    const text = response.toString();
+                    const index = text.indexOf('\n');
+                    throw new Error(text.substring(0, index === -1 ? text.length : index));
+                })
+        } catch (error) {
+            console.error('Error:', error);
+            document.querySelector('#error-response').textContent = error;
         }
     }
 
